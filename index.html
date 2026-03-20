@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutritional Insights</title>
+
+    <!-- Tailwind -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="bg-gray-100">
+
+<header class="bg-blue-600 p-4 text-white">
+    <h1 class="text-3xl font-semibold">Nutritional Insights</h1>
+</header>
+
+<main class="container mx-auto p-6">
+
+<section class="mb-8">
+    <h2 class="text-2xl font-semibold mb-4">Explore Nutritional Insights</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <div class="bg-white p-4 shadow-lg rounded-lg">
+            <h3 class="font-semibold">Bar Chart</h3>
+            <canvas id="barChart"></canvas>
+        </div>
+
+        <div class="bg-white p-4 shadow-lg rounded-lg">
+            <h3 class="font-semibold">Scatter Plot</h3>
+            <canvas id="scatterPlot"></canvas>
+        </div>
+
+        <div class="bg-white p-4 shadow-lg rounded-lg">
+            <h3 class="font-semibold">Heatmap (Simulated)</h3>
+            <canvas id="heatmap"></canvas>
+        </div>
+
+        <div class="bg-white p-4 shadow-lg rounded-lg">
+            <h3 class="font-semibold">Pie Chart</h3>
+            <canvas id="pieChart"></canvas>
+        </div>
+
+    </div>
+</section>
+
+<section class="mb-8">
+    <div>
+        <select id="dietSelect" class="p-2 border rounded w-full sm:w-auto mb-4">
+            <option value="all">All Diet Types</option>
+            <option value="Vegan">Vegan</option>
+            <option value="Keto">Keto</option>
+            <option value="Paleo">Paleo</option>
+        </select>
+    </div>
+
+    <div>
+        <button onclick="loadData()" class="bg-blue-600 text-white py-2 px-4 rounded">
+            Load Data
+        </button>
+    </div>
+</section>
+
+</main>
+
+<script>
+const API_URL = "https://diet-function-123.azurewebsites.net/api/analyze";
+
+let barChart, scatterChart, pieChart, heatmapChart;
+
+async function loadData() {
+    const diet = document.querySelector("select").value;
+    const res = await fetch(API_URL + "?diet=" + diet);
+    const data = await res.json();
+
+    renderBar(data);
+    renderScatter(data);
+    renderPie(data);
+    renderHeatmap(data);
+}
+
+function renderBar(data) {
+    if (barChart) barChart.destroy();
+
+    const ctx = document.getElementById('barChart');
+
+    barChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [
+                { label: 'Protein', data: data.protein },
+                { label: 'Carbs', data: data.carbs },
+                { label: 'Fat', data: data.fat }
+            ]
+        }
+    });
+}
+
+function renderScatter(data) {
+    if (scatterChart) scatterChart.destroy();
+
+    const ctx = document.getElementById('scatterPlot');
+
+    const scatterData = data.protein.map((p, i) => ({
+        x: p,
+        y: data.carbs[i]
+    }));
+
+    scatterChart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Protein vs Carbs',
+                data: scatterData
+            }]
+        }
+    });
+}
+
+function renderPie(data) {
+    if (pieChart) pieChart.destroy();
+
+    const ctx = document.getElementById('pieChart');
+
+    pieChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.protein
+            }]
+        }
+    });
+}
+
+function renderHeatmap(data) {
+    if (heatmapChart) heatmapChart.destroy();
+
+    const ctx = document.getElementById('heatmap');
+
+    // fake heatmap using bar chart (simple workaround)
+    heatmapChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [
+                { label: 'Protein', data: data.protein },
+                { label: 'Carbs', data: data.carbs },
+                { label: 'Fat', data: data.fat }
+            ]
+        }
+    });
+}
+</script>
+
+</body>
+</html>
