@@ -23,7 +23,6 @@ project.lock.json
 .secrets
 appsettings.json
 local.settings.json
-diet_users.db
 
 node_modules
 dist
