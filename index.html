@@ -272,9 +272,23 @@
         }
         const res = await fetch(API_BASE + path, Object.assign({ headers: authHeaders() }, opts || {}));
         const text = await res.text();
+        const trimmed = text.trim();
+        if (trimmed.startsWith('<')) {
+            throw new Error(
+                'The server returned a web page (HTML), not JSON (HTTP ' + res.status + '). ' +
+                'Usually the API URL is wrong or the Function App is down. Use your Azure Function base ending in /api ' +
+                '(example: https://YOUR-APP.azurewebsites.net/api), not a GitHub Pages or static file URL.'
+            );
+        }
         let data;
-        try { data = JSON.parse(text); } catch (_) { data = { error: text || res.statusText }; }
-        if (!res.ok) throw new Error(data.error || res.statusText);
+        try {
+            data = JSON.parse(text);
+        } catch (parseErr) {
+            throw new Error(
+                'Invalid JSON from API (HTTP ' + res.status + '): ' + (trimmed ? trimmed.slice(0, 160) : res.statusText)
+            );
+        }
+        if (!res.ok) throw new Error((data && data.error) || res.statusText || 'Request failed');
         return data;
     }
 
@@ -327,13 +341,10 @@
                 email: document.getElementById('loginEmail').value,
                 password: document.getElementById('loginPassword').value
             };
-            const res = await fetch(API_BASE + '/auth/login', {
+            const data = await apiFetch('/auth/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Login failed');
             localStorage.setItem(TOKEN_KEY, data.token);
             showDash(data.user);
             loadCharts();
@@ -354,13 +365,10 @@
                 password: document.getElementById('regPassword').value,
                 display_name: document.getElementById('regName').value || document.getElementById('regEmail').value
             };
-            const res = await fetch(API_BASE + '/auth/register', {
+            const data = await apiFetch('/auth/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Register failed');
             localStorage.setItem(TOKEN_KEY, data.token);
             showDash(data.user);
             loadCharts();
