@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Optional: set your Azure Function App URL so GitHub Pages can reach the API (same value as in ?api=). -->
+    <meta name="diet-api-base" content="">
     <title>Nutritional Insights</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -51,12 +53,20 @@
             </form>
 
             <div class="mt-6 border-t pt-6">
+                <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded">
+                    <label class="block text-sm font-medium text-gray-800 mb-1" for="apiBaseInput">Azure Function API base</label>
+                    <p class="text-xs text-gray-600 mb-2">GitHub Pages only serves this HTML. Login, OAuth, and charts must call your Function App. Example: <code class="bg-white px-1 rounded">https://your-app.azurewebsites.net/api</code>. In Azure, set <code class="bg-white px-1">FRONTEND_URL</code> to this site’s URL so OAuth can redirect back here.</p>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="url" id="apiBaseInput" class="flex-1 p-2 border rounded text-sm" placeholder="https://your-app.azurewebsites.net/api">
+                        <button type="button" id="btnSaveApiBase" class="bg-amber-600 text-white py-2 px-4 rounded text-sm whitespace-nowrap">Save &amp; reload</button>
+                    </div>
+                </div>
                 <p class="text-sm text-gray-500 mb-3">Or continue with</p>
                 <div class="flex flex-col gap-2">
                     <a id="linkGoogle" href="#" class="text-center bg-white border border-gray-300 text-gray-800 py-2 px-4 rounded font-medium">Login with Google</a>
                     <a id="linkGitHub" href="#" class="text-center bg-gray-900 text-white py-2 px-4 rounded font-medium">Login with GitHub</a>
                 </div>
-                <p class="text-xs text-gray-400 mt-4">API base: <span id="apiBaseLabel"></span>. Override with <code class="bg-gray-100 px-1 rounded">?api=http://localhost:7071/api</code></p>
+                <p class="text-xs text-gray-500 mt-4">Using API: <span id="apiBaseLabel" class="font-mono break-all"></span>. You can also open this page with <code class="bg-gray-100 px-1 rounded">?api=https://your-app.azurewebsites.net/api</code></p>
             </div>
         </div>
     </div>
@@ -192,16 +202,36 @@
 
 <script>
 (function () {
-    const API_BASE = (() => {
-        const q = new URLSearchParams(location.search).get('api');
-        if (q) return q.replace(/\/$/, '');
-        const saved = localStorage.getItem('DIET_API_BASE');
-        if (saved) return saved.replace(/\/$/, '');
+    function normalizeApiBase(s) {
+        if (!s || !String(s).trim()) return null;
+        var v = String(s).trim().replace(/\/+$/, '');
+        if (!/\/api$/i.test(v)) {
+            v = v + '/api';
+        }
+        return v;
+    }
+
+    function resolveApiBase() {
+        var meta = document.querySelector('meta[name="diet-api-base"]');
+        var metaVal = meta && meta.getAttribute('content');
+        if (metaVal && metaVal.trim()) return normalizeApiBase(metaVal);
+        var q = new URLSearchParams(location.search).get('api');
+        if (q) return normalizeApiBase(q);
+        var saved = localStorage.getItem('DIET_API_BASE');
+        if (saved) return normalizeApiBase(saved);
+        if (typeof window.DIET_API_BASE === 'string' && window.DIET_API_BASE.trim()) {
+            return normalizeApiBase(window.DIET_API_BASE);
+        }
         if (location.port === '4280' || location.port === '5500' || location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
             return 'http://localhost:7071/api';
         }
-        return (location.origin + '/api').replace(/\/$/, '');
-    })();
+        if (location.hostname.indexOf('github.io') !== -1 || location.protocol === 'file:') {
+            return null;
+        }
+        return normalizeApiBase(location.origin + '/api');
+    }
+
+    var API_BASE = resolveApiBase();
 
     const TOKEN_KEY = 'DIET_JWT';
 
@@ -212,7 +242,34 @@
         return h;
     }
 
+    function bindOAuthLinks() {
+        var g = document.getElementById('linkGoogle');
+        var gh = document.getElementById('linkGitHub');
+        if (!API_BASE) {
+            g.setAttribute('href', '#');
+            gh.setAttribute('href', '#');
+            g.onclick = function (e) {
+                e.preventDefault();
+                alert('Set your Azure Function API base in the yellow box above, then click Save & reload.');
+                return false;
+            };
+            gh.onclick = g.onclick;
+            g.classList.add('opacity-60');
+            gh.classList.add('opacity-60');
+        } else {
+            g.setAttribute('href', API_BASE + '/auth/oauth/google');
+            gh.setAttribute('href', API_BASE + '/auth/oauth/github');
+            g.onclick = null;
+            gh.onclick = null;
+            g.classList.remove('opacity-60');
+            gh.classList.remove('opacity-60');
+        }
+    }
+
     async function apiFetch(path, opts) {
+        if (!API_BASE) {
+            throw new Error('Set your Azure Function API base URL (yellow box), then Save & reload.');
+        }
         const res = await fetch(API_BASE + path, Object.assign({ headers: authHeaders() }, opts || {}));
         const text = await res.text();
         let data;
@@ -237,7 +294,19 @@
         showAuth();
     }
 
-    document.getElementById('apiBaseLabel').textContent = API_BASE;
+    document.getElementById('apiBaseLabel').textContent = API_BASE || '(not set — required on GitHub Pages)';
+    document.getElementById('apiBaseInput').value = API_BASE || '';
+    document.getElementById('btnSaveApiBase').onclick = function () {
+        var v = document.getElementById('apiBaseInput').value.trim();
+        if (!v) {
+            alert('Paste your Function App URL (e.g. https://your-app.azurewebsites.net/api)');
+            return;
+        }
+        localStorage.setItem('DIET_API_BASE', normalizeApiBase(v));
+        location.reload();
+    };
+
+    bindOAuthLinks();
 
     document.getElementById('tabLogin').onclick = () => {
         document.getElementById('loginForm').classList.remove('hidden');
@@ -248,14 +317,12 @@
         document.getElementById('loginForm').classList.add('hidden');
     };
 
-    document.getElementById('linkGoogle').href = API_BASE + '/auth/oauth/google';
-    document.getElementById('linkGitHub').href = API_BASE + '/auth/oauth/github';
-
     document.getElementById('loginForm').onsubmit = async (e) => {
         e.preventDefault();
         const err = document.getElementById('loginError');
         err.classList.add('hidden');
         try {
+            if (!API_BASE) throw new Error('Set the Azure Function API base (yellow box) and Save & reload.');
             const body = {
                 email: document.getElementById('loginEmail').value,
                 password: document.getElementById('loginPassword').value
@@ -281,6 +348,7 @@
         const err = document.getElementById('registerError');
         err.classList.add('hidden');
         try {
+            if (!API_BASE) throw new Error('Set the Azure Function API base (yellow box) and Save & reload.');
             const body = {
                 email: document.getElementById('regEmail').value,
                 password: document.getElementById('regPassword').value,
@@ -483,6 +551,10 @@
 
     async function boot() {
         consumeOAuthTokenFromHash();
+        if (!API_BASE) {
+            showAuth();
+            return;
+        }
         const token = localStorage.getItem(TOKEN_KEY);
         if (!token) {
             showAuth();
