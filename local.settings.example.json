@@ -8,7 +8,6 @@
     "CORS_ORIGIN": "*",
     "BLOB_CONTAINER": "datasets",
     "REDIS_CONNECTION_STRING": "",
-    "AZURE_SQL_CONNECTION_STRING": "Server=tcp:YOUR_SERVER.database.windows.net,1433;Database=YOUR_DB;Uid=YOUR_USER;Pwd=YOUR_PASSWORD;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;",
     "GOOGLE_CLIENT_ID": "",
     "GOOGLE_CLIENT_SECRET": "",
     "GITHUB_CLIENT_ID": "",

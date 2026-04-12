@@ -19,5 +19,10 @@ GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
 
 REDIS_CONNECTION_STRING = os.environ.get("REDIS_CONNECTION_STRING", "")
 
-# ODBC connection string for Azure SQL Database (users table). Required for auth.
-AZURE_SQL_CONNECTION_STRING = os.environ.get("AZURE_SQL_CONNECTION_STRING", "").strip()
+def _default_sqlite_path() -> str:
+    if os.environ.get("WEBSITE_INSTANCE_ID"):
+        return "/tmp/diet_users.db"
+    return os.path.join(os.path.dirname(__file__), "..", "diet_users.db")
+
+
+SQLITE_PATH = os.environ.get("SQLITE_PATH", _default_sqlite_path())
