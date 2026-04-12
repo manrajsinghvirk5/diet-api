@@ -205,12 +205,43 @@
         return h;
     }
 
+    function summarizeBody(text, maxLen) {
+        if (!text || !String(text).trim()) return '(empty body)';
+        var t = String(text).replace(/^\uFEFF/, '').trim();
+        if (t.charAt(0) === '<' || /<\s*!DOCTYPE/i.test(t) || /<\s*html/i.test(t)) {
+            return 'HTML error page (often wrong URL or app not deployed), not JSON.';
+        }
+        if (t.length > maxLen) return t.slice(0, maxLen) + '…';
+        return t;
+    }
+
     async function apiFetch(path, opts) {
-        const res = await fetch(API_BASE + path, Object.assign({ headers: authHeaders() }, opts || {}));
+        var url = API_BASE + path;
+        const res = await fetch(url, Object.assign({ headers: authHeaders() }, opts || {}));
         const text = await res.text();
+        var trimmed = text.replace(/^\uFEFF/, '').trim();
+        if (trimmed.charAt(0) === '<' || /<\s*html/i.test(trimmed)) {
+            var hint404 = res.status === 404
+                ? ' (404: no function at this path — confirm this Function App name in Azure and that you published the app.)'
+                : '';
+            throw new Error('Server returned HTML instead of JSON for ' + url + hint404);
+        }
         let data;
-        try { data = JSON.parse(text); } catch (_) { data = { error: text || res.statusText }; }
-        if (!res.ok) throw new Error(data.error || res.statusText);
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error('[apiFetch] JSON.parse failed', url, e, summarizeBody(text, 300));
+            throw new Error('Invalid JSON from API (HTTP ' + res.status + '): ' + summarizeBody(text, 200));
+        }
+        if (!res.ok) {
+            var msg = (data && typeof data.error === 'string' && data.error.length < 500)
+                ? data.error
+                : summarizeBody(text, 300);
+            if (res.status === 404) {
+                msg = 'HTTP 404 — endpoint not found: ' + url + '. Deploy your code to this Function App or fix API_BASE.';
+            }
+            throw new Error(msg || res.statusText || 'Request failed');
+        }
         return data;
     }
 
@@ -263,7 +294,9 @@
             showDash(data.user);
             loadCharts();
         } catch (x) {
-            err.textContent = x.message;
+            console.error('[login]', x);
+            var m = (x && x.message) ? String(x.message) : String(x);
+            err.textContent = m.length > 800 ? m.slice(0, 800) + '…' : m;
             err.classList.remove('hidden');
         }
     };
@@ -288,7 +321,9 @@
             showDash(data.user);
             loadCharts();
         } catch (x) {
-            err.textContent = x.message;
+            console.error('[register]', x);
+            var m = (x && x.message) ? String(x.message) : String(x);
+            err.textContent = m.length > 800 ? m.slice(0, 800) + '…' : m;
             err.classList.remove('hidden');
         }
     };
