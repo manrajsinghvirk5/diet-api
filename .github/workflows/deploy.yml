@@ -1,3 +1,10 @@
+# Azure Functions → use Azure/functions-action (Kudu zipdeploy).
+# azure/webapps-deploy@v3 uses OneDeploy and often fails on Function Apps with
+# 415 Unsupported Media Type / runtime detection warnings — not the right action here.
+#
+# Publish profile: GitHub secret AZURE_FUNCTIONAPP_PUBLISH_PROFILE = full <publishData>… XML.
+# Portal → Configuration → General settings → SCM Basic Auth Publishing Credentials = On
+
 name: Deploy Python API to Azure
 
 on:
@@ -13,7 +20,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AZURE_FUNCTIONAPP_NAME: diet-api 
+  # Must match the Function App name in Azure Portal (same app as the publish profile).
+  AZURE_FUNCTIONAPP_NAME: diet-api
   PYTHON_VERSION: "3.11"
 
 jobs:
@@ -28,17 +36,17 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
+      - name: Install dependencies into .python_packages
         run: |
+          set -e
           python -m pip install --upgrade pip wheel
+          mkdir -p .python_packages/lib/site-packages
           pip install -r requirements.txt --target=".python_packages/lib/site-packages"
 
-      - name: Zip for Deployment
-        run: zip -r release.zip . -x "*.git*"
-
-      - name: Deploy via WebApps (Bypasses 404/405)
-        uses: azure/webapps-deploy@v3
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1.5.1
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: "."
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
-          package: 'release.zip'
+          respect-funcignore: true
