@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # This is the "True Name" that successfully connected in your logs
+  # STEP: Paste the EXACT name from the "All Resources" Name column here
   AZURE_FUNCTIONAPP_NAME: diet-api-hfegcjavhcamckcc 
   PYTHON_VERSION: "3.11"
 
@@ -35,10 +35,10 @@ jobs:
           pip install -r requirements.txt --target=".python_packages/lib/site-packages"
 
       - name: Zip for Deployment
-        # We manually zip it to fix the "415 Unsupported Media Type" error
+        # This bypasses the "415 Unsupported Media Type" error
         run: zip -r release.zip . -x "*.git*"
 
-      - name: The Final Bypass — Deploy Zip
+      - name: The Bypass — Deploy Zip
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
